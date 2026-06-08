@@ -42,7 +42,7 @@ class AeronPubSubTest {
 		AeronPublisher pub = new AeronPublisher(30004, 1002);
 		pub.start();
 		List<String> msgReceived = new ArrayList<>(1);
-		AeronSubscriber sub = new AeronSubscriber(30004, 1002, s->{log.info("sub received: {}", s); msgReceived.add(s);});
+		AeronSubscriber sub = new AeronSubscriber(30004, 1002, s->{log.info("testPubSub1to1 - sub received: {}", s); msgReceived.add(s);});
 		sub.start();
 		Thread.sleep(1000);
 		long position = pub.publish(MSG);
@@ -59,12 +59,12 @@ class AeronPubSubTest {
 		final String MSG = "msg";
 		AeronPublisher pub = new AeronPublisher(30005, 1003);
 		pub.start();
-		int n = 10;
+		final int n = 10;
 		List<String> msgReceived = new ArrayList<>(n);
 		
 		AeronSubscriber[] subs = new AeronSubscriber[n];
 		for (int i = 0; i < n; i++) {		
-			subs[i] = new AeronSubscriber(30005, 1003, s->{log.info("sub received: {}", s); msgReceived.add(s);});
+			subs[i] = new AeronSubscriber(30005, 1003, s->{log.info("testPubSub1toN - sub received: {}", s); msgReceived.add(s);});
 			subs[i].start();
 		}
 		
@@ -80,6 +80,57 @@ class AeronPubSubTest {
 		for (int i = 0; i < n; i++) {
 			subs[i].stop();
 		}
+		pub.stop();
+	}
+	
+	@Test
+	void testPubSubMultipleMessages() throws InterruptedException {
+		final String MSG = "msg";
+		AeronPublisher pub = new AeronPublisher(30006, 1004);
+		pub.start();
+		List<String> msgReceived = new ArrayList<>(1);
+		AeronSubscriber sub = new AeronSubscriber(30006, 1004, s->{log.info("testPubSubMultipleMessages - sub received: {}", s); msgReceived.add(s);});
+		sub.start();
+		Thread.sleep(1000);
+		final int n = 10;
+		for (int i = 0; i < n; i++) {
+			long position = pub.publish(MSG + i);
+			assert position > 0;
+		}
+		Thread.sleep(1000);
+		for (int i = 0; i < n; i++) {
+			assert (MSG + i).equals(msgReceived.get(i));
+		}
+		Thread.sleep(1000);
+		sub.stop();
+		pub.stop();
+	}
+	
+	@Test
+	void testPubFirstThenSubStart() throws InterruptedException {
+		final String MSG = "msg";
+		final String MSG2 = "msg2";
+		AeronPublisher pub = new AeronPublisher(30007, 1005);
+		pub.start();
+		
+		long position = pub.publish(MSG);
+		assert position == -1L;
+		
+		List<String> msgReceived = new ArrayList<>(1);
+		AeronSubscriber sub = new AeronSubscriber(30007, 1005, s->{log.info("testPubFirstThenSubStart - sub received: {}", s); msgReceived.add(s);});
+		sub.start();
+		
+		Thread.sleep(1000);
+		
+		position = pub.publish(MSG2);
+		assert position > 0;
+		
+		Thread.sleep(1000);
+		
+		assert msgReceived.size() == 1;
+		assert MSG2.equals(msgReceived.get(0));
+		
+		sub.stop();
 		pub.stop();
 	}
 	
