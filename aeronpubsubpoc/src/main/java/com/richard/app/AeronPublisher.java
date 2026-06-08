@@ -35,12 +35,14 @@ public class AeronPublisher {
 	}
 	
 	public AeronPublisher(String host, int port, int streamid) {
-		this("aeron:udp?endpoint=" + host + ":" + port, streamid);
+		this("aeron:udp?control-mode=dynamic|control=" + host + ":" + port, streamid);
 	}
 	
 	public void start() {
 		//TODO to be changed to external later
-		this.driver = MediaDriver.launchEmbedded();
+		final MediaDriver.Context driverCtx = new MediaDriver.Context()
+				.spiesSimulateConnection(true).dirDeleteOnStart(true).dirDeleteOnShutdown(true);
+		this.driver = MediaDriver.launchEmbedded(driverCtx);
 		this.ctx.aeronDirectoryName(this.driver.aeronDirectoryName());
 		this.aeron = Aeron.connect(this.ctx);
 		this.publication = aeron.addPublication(this.channel, this.streamid);
@@ -56,7 +58,9 @@ public class AeronPublisher {
 	
 	public long publish(String msg) {
 		try {
-			return this.publication.offer(buffer, 0, this.buffer.putStringAscii(0, msg));
+			final int length = this.buffer.putStringWithoutLengthAscii(0, msg);
+			log.debug("msg: {} length: {}", msg, length);
+			return this.publication.offer(buffer, 0, length);
 		}
 		catch (NullPointerException npe) {
 			if (!isStarted) {

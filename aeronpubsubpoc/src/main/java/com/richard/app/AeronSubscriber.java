@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import io.aeron.Aeron;
 import io.aeron.FragmentAssembler;
+import io.aeron.Image;
 import io.aeron.Subscription;
 import io.aeron.driver.MediaDriver;
 import io.aeron.logbuffer.FragmentHandler;
@@ -27,7 +28,7 @@ public class AeronSubscriber {
 	final AtomicBoolean running;
 	private static final int FRAGMENT_COUNT_LIMIT = 10;
 	private AeronSubscriber(String channel, int streamid, Consumer<String> msgHandler) {
-		this.ctx = new Aeron.Context();
+		this.ctx = new Aeron.Context().availableImageHandler(AeronSubscriber::printAvailableImage);
 		this.channel = channel;
 		this.streamid = streamid;
 		this.msgHandler = msgHandler;
@@ -39,12 +40,15 @@ public class AeronSubscriber {
 	}
 	
 	public AeronSubscriber(String host, int port, int streamid, Consumer<String> msgHandler) {
-		this("aeron:udp?endpoint=" + host + ":" + port, streamid, msgHandler);
+		this("aeron:udp?control-mode=dynamic|control=" + host + ":" + port, streamid, msgHandler);
 	}
 
 	public void start() {
 		if (this.running.getAndSet(true) == false) {
-			this.driver = MediaDriver.launchEmbedded();
+			final MediaDriver.Context driverCtx = new MediaDriver.Context()
+					.spiesSimulateConnection(true).dirDeleteOnStart(true).dirDeleteOnShutdown(true);
+			this.driver = MediaDriver.launchEmbedded(driverCtx);
+			this.ctx.aeronDirectoryName(driver.aeronDirectoryName());
 			this.aeron = Aeron.connect(this.ctx);
 			this.subscription = aeron.addSubscription(this.channel, this.streamid);
 			this.subscriptionThread = new Thread(()-> {
@@ -52,6 +56,7 @@ public class AeronSubscriber {
 
 			}, this.toString() + "-subscriptionThread");
 			this.subscriptionThread.start();
+			
 		} else {
 			log.warn("already started!");
 		}
@@ -63,7 +68,7 @@ public class AeronSubscriber {
         return (buffer, offset, length, header) ->
         {
             final String msg = buffer.getStringWithoutLengthAscii(offset, length);
-            log.debug("session: {} msg received: {}", header.sessionId(), msg);
+            log.debug("session: {} offset: {} length: {} msg received: {}", header.sessionId(), offset, length, msg);
             msgHandler.accept(msg);
         };
     }
@@ -103,5 +108,23 @@ public class AeronSubscriber {
 		}
 		
 	}
+	
+    public static void printAvailableImage(final Image image)
+    {
+        final Subscription subscription = image.subscription();
+        log.debug(
+            "Available image on {} streamId={} sessionId={} mtu={} term-length={} from {}{}",
+            subscription.channel(), subscription.streamId(), image.sessionId(), image.mtuLength(),
+            image.termBufferLength(), image.sourceIdentity());
+    }
+
+    public static void printUnavailableImage(final Image image)
+    {
+        final Subscription subscription = image.subscription();
+        log.debug(
+            "Unavailable image on {} streamId={} sessionId={}{}",
+            subscription.channel(), subscription.streamId(), image.sessionId());
+    }
+
 	
 }
