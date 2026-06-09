@@ -27,12 +27,14 @@ public class AeronSubscriber {
 	private Thread subscriptionThread = null;
 	final AtomicBoolean running;
 	private static final int FRAGMENT_COUNT_LIMIT = 10;
+	private IdleStrategy idleStrategy = null;
 	private AeronSubscriber(String channel, int streamid, Consumer<String> msgHandler) {
 		this.ctx = new Aeron.Context().availableImageHandler(AeronSubscriber::printAvailableImage);
 		this.channel = channel;
 		this.streamid = streamid;
 		this.msgHandler = msgHandler;
 		this.running = new AtomicBoolean(false);
+		this.idleStrategy = new YieldingIdleStrategy();
 	}
 	
 	public AeronSubscriber(int port, int streamid, Consumer<String> msgHandler) {
@@ -42,7 +44,7 @@ public class AeronSubscriber {
 	public AeronSubscriber(String host, int port, int streamid, Consumer<String> msgHandler) {
 		this("aeron:udp?control-mode=dynamic|control=" + host + ":" + port, streamid, msgHandler);
 	}
-
+	
 	public void start() {
 		if (this.running.getAndSet(true) == false) {
 			final MediaDriver.Context driverCtx = new MediaDriver.Context()
@@ -52,7 +54,7 @@ public class AeronSubscriber {
 			this.aeron = Aeron.connect(this.ctx);
 			this.subscription = aeron.addSubscription(this.channel, this.streamid);
 			this.subscriptionThread = new Thread(()-> {
-				subscriberLoop(getHandler(this.msgHandler), FRAGMENT_COUNT_LIMIT, this.running, new YieldingIdleStrategy()).accept(subscription);
+				subscriberLoop(getHandler(this.msgHandler), FRAGMENT_COUNT_LIMIT, this.running, this.idleStrategy).accept(subscription);
 
 			}, this.toString() + "-subscriptionThread");
 			this.subscriptionThread.start();

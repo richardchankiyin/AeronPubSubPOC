@@ -1,8 +1,10 @@
 package com.richard.app;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,4 +136,19 @@ class AeronPubSubTest {
 		pub.stop();
 	}
 	
+	
+	@Disabled
+	@Test
+	void testArchivablePubNotConnected() {
+		final String DIR = "archive/testArchivablePubNotConnected";
+		File dir = new File(DIR);
+		dir.mkdirs();
+		final String MSG = "msg";
+		AeronPublisher pub = new AeronArchivablePublisher(30008, 1006, DIR);
+		pub.start();
+		long position = pub.publish(MSG);
+		log.info("position: {}", position);			
+		pub.stop();
+		assert position == -1L;
+	}
 }

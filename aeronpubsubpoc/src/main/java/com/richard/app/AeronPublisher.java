@@ -45,6 +45,22 @@ public class AeronPublisher {
 		return MediaDriver.launchEmbedded(driverCtx);
 	}
 	
+	protected Aeron getAeron() {
+		return this.aeron;
+	}
+	
+	protected String getChannel() {
+		return this.channel;
+	}
+	
+	protected int getStreamid() {
+		return this.streamid;
+	}
+	
+	protected Publication getPublication() {
+		return this.publication;
+	}
+	
 	public void start() {
 		//TODO to be changed to external later
 		
@@ -71,7 +87,9 @@ public class AeronPublisher {
 		catch (NullPointerException npe) {
 			if (!isStarted) {
 				this.start();
-				return this.publication.offer(buffer, 0, this.buffer.putStringAscii(0, msg));
+				final int length = this.buffer.putStringWithoutLengthAscii(0, msg);
+				log.debug("retry msg: {} length: {}", msg, length);
+				return this.publication.offer(buffer, 0, length);
 			}
 			return -999;
 		} catch (Exception e) {
