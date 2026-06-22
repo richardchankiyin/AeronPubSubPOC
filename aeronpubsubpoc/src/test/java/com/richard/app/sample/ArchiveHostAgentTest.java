@@ -1,6 +1,5 @@
 package com.richard.app.sample;
 
-import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -32,17 +31,19 @@ class ArchiveHostAgentTest {
 		ArchiveClientAgent clientagent = new ArchiveClientAgent("localhost", "localhost", 17000, 17001, handle);
 
 		clientagent.onStart();
-		Thread.sleep(1000);
-		clientagent.doWork();
-		Thread.sleep(1000);
-		clientagent.doWork();
-		Thread.sleep(1000);
-		clientagent.doWork();
-		Thread.sleep(2000);
+		int i = 0;
+		while (i < 25) {
+			log.info("i: {}", i);
+			clientagent.doWork();
+			Thread.sleep(10);
+			i++;
+		}
 		
 		clientagent.onClose();
 		
-		agent.onClose();		
+		agent.onClose();
+		
+		assert handle.getCount() == 2;
 	}
 	
 	
