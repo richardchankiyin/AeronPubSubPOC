@@ -37,6 +37,10 @@ public class AeronSubscriber {
 		this.idleStrategy = new YieldingIdleStrategy();
 	}
 	
+	public AeronSubscriber(int streamid, Consumer<String> msgHandler) {
+		this("aeron:ipc", streamid, msgHandler);
+	}
+	
 	public AeronSubscriber(int port, int streamid, Consumer<String> msgHandler) {
 		this("localhost", port, streamid, msgHandler);
 	}
@@ -115,7 +119,7 @@ public class AeronSubscriber {
     {
         final Subscription subscription = image.subscription();
         log.debug(
-            "Available image on {} streamId={} sessionId={} mtu={} term-length={} from {}{}",
+            "Available image on {} streamId={} sessionId={} mtu={} term-length={} from {}",
             subscription.channel(), subscription.streamId(), image.sessionId(), image.mtuLength(),
             image.termBufferLength(), image.sourceIdentity());
     }
@@ -124,7 +128,7 @@ public class AeronSubscriber {
     {
         final Subscription subscription = image.subscription();
         log.debug(
-            "Unavailable image on {} streamId={} sessionId={}{}",
+            "Unavailable image on {} streamId={} sessionId={}",
             subscription.channel(), subscription.streamId(), image.sessionId());
     }
 

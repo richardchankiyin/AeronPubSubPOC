@@ -18,14 +18,18 @@ public class App {
         AeronSubscriber sub = new AeronSubscriber(3999, 1999, s->{log.info(s); messages.add(s);});
         sub.start();
         Thread.sleep(1000);
-        for (int i = 0; i < 100_000; i++) {
-        	long position = pub.publish("testing" + i);
-        	log.info("{} position: {}", i, position);
-        
-        }
-        
+        Thread pubt = new Thread(()-> {
+	        for (int i = 0; i < 100_000; i++) {
+	        	long position = pub.publish("testing" + i);
+	        	log.info("{} position: {}", i, position);
+	        
+	        }
+        }, "pubt");
+        pubt.start();
+        pubt.join();        
         
         pub.stop();
+        Thread.sleep(1000);
         sub.stop();
         log.info("message received count: {}", messages.size());
     }

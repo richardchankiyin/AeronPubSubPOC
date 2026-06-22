@@ -144,7 +144,8 @@ class AeronPubSubTest {
 		File dir = new File(DIR);
 		dir.mkdirs();
 		final String MSG = "msg";
-		AeronPublisher pub = new AeronArchivablePublisher(30008, 1006, DIR);
+		//AeronPublisher pub = new AeronArchivablePublisher(30008, 31008,32008,33008, 1006, DIR);
+		AeronPublisher pub = new AeronArchivablePublisher(31008,32008,33008, 1006, DIR);
 		pub.start();
 		long position = pub.publish(MSG);
 		log.info("position: {}", position);			

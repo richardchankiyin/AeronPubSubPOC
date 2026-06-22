@@ -23,7 +23,7 @@ public class AeronPublisher {
 	private boolean isStarted = false;
 	private UnsafeBuffer buffer;
 	
-	private AeronPublisher(String channel, int streamid) {
+	protected AeronPublisher(String channel, int streamid) {
 		this.ctx = new Aeron.Context();
 		this.channel = channel;
 		this.streamid = streamid;
