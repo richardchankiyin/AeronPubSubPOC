@@ -136,6 +136,21 @@ class AeronPubSubTest {
 		pub.stop();
 	}
 	
+	@Test
+	void testArchiverStart() throws InterruptedException {
+		AeronArchiver archiver = new AeronArchiver("localhost", 30008, 31008);
+		archiver.onStart();
+		
+		assert State.ARCHIVE_READY == archiver.getState();
+		
+		long position = archiver.appendMsg("testing");
+		
+		assert position > 0;
+		
+		archiver.onClose();
+		
+	}
+	
 	
 	@Disabled
 	@Test

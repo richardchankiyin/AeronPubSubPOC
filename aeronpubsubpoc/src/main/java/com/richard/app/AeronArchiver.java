@@ -1,4 +1,4 @@
-package com.richard.app.sample;
+package com.richard.app;
 
 import io.aeron.Aeron;
 import io.aeron.Publication;
@@ -6,15 +6,19 @@ import io.aeron.archive.Archive;
 import io.aeron.archive.ArchiveThreadingMode;
 import io.aeron.archive.ArchivingMediaDriver;
 import io.aeron.archive.client.AeronArchive;
+import io.aeron.archive.client.ControlEventListener;
 import io.aeron.archive.client.RecordingEventsAdapter;
+import io.aeron.archive.client.RecordingEventsListener;
 import io.aeron.archive.client.RecordingSignalAdapter;
+import io.aeron.archive.client.RecordingSignalConsumer;
+import io.aeron.archive.codecs.ControlResponseCode;
+import io.aeron.archive.codecs.RecordingSignal;
 import io.aeron.archive.codecs.SourceLocation;
 import io.aeron.archive.status.RecordingPos;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
 import org.agrona.CloseHelper;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.Agent;
 import org.agrona.concurrent.EpochClock;
 import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SleepingMillisIdleStrategy;
@@ -24,6 +28,7 @@ import org.agrona.concurrent.status.CountersReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -32,12 +37,11 @@ import java.nio.ByteBuffer;
 import java.util.Enumeration;
 import java.util.Objects;
 
-public class ArchiveHostAgent implements Agent
+public class AeronArchiver
 {
     public static final String AERON_UDP_ENDPOINT = "aeron:udp?endpoint=";
-    private static final EpochClock CLOCK = SystemEpochClock.INSTANCE;
     private static final int STREAM_ID = 100;
-    private static final Logger LOGGER = LoggerFactory.getLogger(ArchiveHostAgent.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AeronArchiver.class);
     private final ArchivingMediaDriver archivingMediaDriver;
     private final Aeron aeron;
     private final IdleStrategy idleStrategy;
@@ -53,7 +57,7 @@ public class ArchiveHostAgent implements Agent
     private long lastSeq = 0;
     private State currentState;
 
-    public ArchiveHostAgent(final String host, final int controlChannelPort, final int recordingEventsPort)
+    public AeronArchiver(final String host, final int controlChannelPort, final int recordingEventsPort)
     {
         this.host = localHost(host);
         this.controlChannelPort = controlChannelPort;
@@ -112,20 +116,18 @@ public class ArchiveHostAgent implements Agent
         LOGGER.error("unexpected failure {}", throwable.getMessage(), throwable);
     }
 
-    @Override
     public void onStart()
     {
-        LOGGER.info("Starting up");
-        Agent.super.onStart();
+        LOGGER.info("Starting up");   
+        doWork();
     }
 
-    @Override
     public int doWork()
     {
         switch (currentState)
         {
             case AERON_READY -> createArchiveAndRecord();
-            case ARCHIVE_READY -> appendData();
+            case ARCHIVE_READY -> LOGGER.info("ready");
             default -> LOGGER.info("unknown state {}", currentState);
         }
 
@@ -142,15 +144,16 @@ public class ArchiveHostAgent implements Agent
         return 0;
     }
 
-    private void appendData()
+    public long appendMsg(String msg)
     {
-        if (CLOCK.time() >= nextAppend)
-        {
-            lastSeq += 1;
-            mutableDirectBuffer.putLong(0, lastSeq);
-            publication.offer(mutableDirectBuffer, 0, Long.BYTES);
-            nextAppend = CLOCK.time() + 10;
-            LOGGER.info("appended {}", lastSeq);
+        lastSeq += 1;
+	        if (currentState == State.ARCHIVE_READY) {
+	        
+	        final int length = this.mutableDirectBuffer.putStringWithoutLengthAscii(0, msg);
+	        LOGGER.debug("msg: {} length: {}", msg, length);
+			return this.publication.offer(mutableDirectBuffer, 0, length);
+        } else {
+        	return -1;
         }
     }
 
@@ -205,10 +208,8 @@ public class ArchiveHostAgent implements Agent
         this.currentState = State.ARCHIVE_READY;
     }
 
-    @Override
     public void onClose()
     {
-        Agent.super.onClose();
         this.currentState = State.SHUTTING_DOWN;
         LOGGER.info("Shutting down");
         CloseHelper.quietClose(publication);
@@ -246,7 +247,6 @@ public class ArchiveHostAgent implements Agent
         return fallback;
     }
 
-    @Override
     public String roleName()
     {
         return "agent-host";
@@ -256,4 +256,48 @@ public class ArchiveHostAgent implements Agent
     	return this.currentState;
     }
 
+    
+    class ArchiveActivityListener implements ControlEventListener, RecordingSignalConsumer {
+        private static final Logger LOGGER = LoggerFactory.getLogger(ArchiveActivityListener.class);
+
+        @Override
+        public void onResponse(final long controlSessionId, final long correlationId, final long relevantId,
+            final ControlResponseCode code, final String errorMessage)
+        {
+            LOGGER.info("code={} error={}", code, errorMessage);
+        }
+
+        @Override
+        public void onSignal(final long controlSessionId, final long correlationId, final long recordingId,
+            final long subscriptionId, final long position, final RecordingSignal signal)
+        {
+            LOGGER.info("recordingId={} position={}, signal={}", recordingId, position, signal);
+        }
+    }
+    
+    class ArchiveProgressListener implements RecordingEventsListener
+    {
+        private static final Logger LOGGER = LoggerFactory.getLogger(ArchiveProgressListener.class);
+
+        @Override
+        public void onStart(final long recordingId, final long startPosition, final int sessionId, final int streamId,
+            final String channel, final String sourceIdentity)
+        {
+            LOGGER.info("recording started recordingId={} startPos={}", recordingId, startPosition);
+        }
+
+        @Override
+        public void onProgress(final long recordingId, final long startPosition, final long position)
+        {
+            LOGGER.info("recording activity recordingId={} startPos={} position={}", recordingId, startPosition,
+                position);
+        }
+
+        @Override
+        public void onStop(final long recordingId, final long startPosition, final long stopPosition)
+        {
+            LOGGER.info("recording stopped recordingId={} startPos={} stopPos={}", recordingId, startPosition,
+                stopPosition);
+        }
+    }
 }
