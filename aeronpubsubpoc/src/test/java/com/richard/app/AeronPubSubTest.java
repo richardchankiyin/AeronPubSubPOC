@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.aeron.logbuffer.FragmentHandler;
+
 class AeronPubSubTest {
 	private static final Logger log = LoggerFactory.getLogger(AeronPubSubTest.class);
 	@Test
@@ -150,6 +152,43 @@ class AeronPubSubTest {
 		archiver.onClose();
 		
 	}
+	
+	
+	@Test
+	void testArchiverStartAndSubscribe() throws InterruptedException {
+		AeronArchiver archiver = new AeronArchiver("localhost", 30009, 31009);
+		archiver.onStart();
+		
+		assert State.ARCHIVE_READY == archiver.getState();
+		
+		long position = archiver.appendMsg("testing");
+		
+		assert position > 0;
+		
+		
+		AeronArchiveSubcriberFragmentHandler handler = new AeronArchiveSubcriberFragmentHandler();
+		
+		AeronArchiveSubscriber subscriber = new AeronArchiveSubscriber("localhost","localhost",30009,31009,handler);
+		
+		subscriber.connect();
+		
+		subscriber.onStart();
+		
+		archiver.appendMsg("testing2");
+		
+		int i = 0;
+		while (i < 25) {
+			log.info("i: {}", i);
+			subscriber.doWork();
+			Thread.sleep(10);
+			i++;
+		}
+		
+		assert handler.getCount() == 2;
+		
+		subscriber.onClose();
+	}
+	
 	
 	
 	@Disabled
