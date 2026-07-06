@@ -168,7 +168,7 @@ class AeronPubSubTest {
 		
 		AeronArchiveSubcriberFragmentHandler handler = new AeronArchiveSubcriberFragmentHandler();
 		
-		AeronArchiveSubscriber subscriber = new AeronArchiveSubscriber("localhost","localhost",30009,31009,handler);
+		AeronArchiveSubscriber subscriber = new AeronArchiveSubscriber("localhost","localhost",30009,31009,32009,handler);
 		
 		subscriber.connect();
 		
@@ -189,6 +189,36 @@ class AeronPubSubTest {
 		subscriber.onClose();
 	}
 	
+	
+	@Disabled
+	@Test
+	void testReplayMergeSubscribe() throws InterruptedException {
+		AeronPublisher pub = new AeronPublisher("aeron:ipc", 100);
+		AeronArchiver archiver = new AeronArchiver("localhost", 41001, 42001);
+		pub.start();
+		archiver.onStart();
+		pub.publish("testing");
+		archiver.appendMsg("testing");
+		Thread.sleep(1000);
+		AeronArchiveReplayMergeSubscriber sub = new AeronArchiveReplayMergeSubscriber("aeron:udp?control-mode=manual|control=localhost:40001", "localhost", "localhost", 41001,
+		       42001, 0, new AeronArchiveSubcriberFragmentHandler());
+		
+		sub.onStart();
+		int i = 0;
+		while (i < 25) {
+			log.info("i: {}", i);
+			sub.doWork();
+			Thread.sleep(10);
+			i++;
+		}
+		
+		
+		
+		Thread.sleep(1000);
+
+		pub.stop();
+		archiver.onClose();
+	}
 	
 	
 	@Disabled

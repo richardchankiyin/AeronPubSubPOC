@@ -84,7 +84,7 @@ public class AeronArchiver
     {
         LOGGER.info("launching ArchivingMediaDriver");
         final String controlChannel = AERON_UDP_ENDPOINT + host + ":" + controlChannelPort;
-        final String replicationChannel = AERON_UDP_ENDPOINT + host + ":" + controlChannelPort + 1;
+        final String replicationChannel = AERON_UDP_ENDPOINT + host + ":" + (controlChannelPort + 1);
         final String recordingEventsChannel =
             "aeron:udp?control-mode=dynamic|control=" + host + ":" + recordingEventsPort;
 
