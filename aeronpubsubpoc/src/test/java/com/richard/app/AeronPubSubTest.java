@@ -3,13 +3,18 @@ package com.richard.app;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.aeron.logbuffer.FragmentHandler;
+import com.richard.app.sample.RecordedBasicPublisher;
+import com.richard.app.sample.ReplayMergeSubscriber;
+
+import io.aeron.archive.ArchivingMediaDriver;
+
 
 class AeronPubSubTest {
 	private static final Logger log = LoggerFactory.getLogger(AeronPubSubTest.class);
@@ -140,7 +145,7 @@ class AeronPubSubTest {
 	
 	@Test
 	void testArchiverStart() throws InterruptedException {
-		AeronArchiver archiver = new AeronArchiver("localhost", 30008, 31008);
+		AeronArchiver archiver = new AeronArchiver("localhost", 30008, 31008, "target/testArchiverStart");
 		archiver.onStart();
 		
 		assert State.ARCHIVE_READY == archiver.getState();
@@ -156,7 +161,7 @@ class AeronPubSubTest {
 	
 	@Test
 	void testArchiverStartAndSubscribe() throws InterruptedException {
-		AeronArchiver archiver = new AeronArchiver("localhost", 30009, 31009);
+		AeronArchiver archiver = new AeronArchiver("localhost", 30009, 31009, "target/testArchiverStartAndSubscribe");
 		archiver.onStart();
 		
 		assert State.ARCHIVE_READY == archiver.getState();
@@ -189,35 +194,43 @@ class AeronPubSubTest {
 		subscriber.onClose();
 	}
 	
-	
-	@Disabled
+	//@Disabled
 	@Test
 	void testReplayMergeSubscribe() throws InterruptedException {
-		AeronPublisher pub = new AeronPublisher("aeron:ipc", 100);
-		AeronArchiver archiver = new AeronArchiver("localhost", 41001, 42001);
-		pub.start();
-		archiver.onStart();
-		pub.publish("testing");
-		archiver.appendMsg("testing");
+				
+		System.setProperty("aeron.archive.control.channel", "aeron:udp?endpoint=localhost:41001");
+		System.setProperty("aeron.archive.replication.channel","aeron:udp?endpoint=localhost:0");
+		System.setProperty("aeron.archive.control.response.channel","aeron:udp?endpoint=localhost:0");
+		System.setProperty("aeron.spies.simulate.connection","true");
+		System.setProperty("aeron.dir.delete.on.start","true");
+		System.setProperty("aeron.dir.delete.on.shutdown","true");
+		System.setProperty("aeron.archive.dir", "/tmp/" + UUID.randomUUID());
+		try (ArchivingMediaDriver mediaDriver = ArchivingMediaDriver.launch()) {
+		
+		
+		Thread pt = new Thread(()-> {
+			try {
+				RecordedBasicPublisher.publish("aeron:udp?control=localhost:40001|control-mode=dynamic|alias=replay-merge-sample", 100, 20);
+			}
+			catch (InterruptedException e) {
+				log.error("interrupted exception", e);
+			}
+		});
+		pt.start();
+		
 		Thread.sleep(1000);
-		AeronArchiveReplayMergeSubscriber sub = new AeronArchiveReplayMergeSubscriber("aeron:udp?control-mode=manual|control=localhost:40001", "localhost", "localhost", 41001,
-		       42001, 0, new AeronArchiveSubcriberFragmentHandler());
+		Thread st = new Thread(()-> {
+			ReplayMergeSubscriber.subscribe(
+				100, "aeron:udp?control=localhost:40001", "aeron:udp?endpoint=localhost:0", "aeron:udp?endpoint=localhost:41001", "aeron:udp?endpoint=localhost:0", "aeron:udp?control-mode=manual", 100, false);
+		});
 		
-		sub.onStart();
-		int i = 0;
-		while (i < 25) {
-			log.info("i: {}", i);
-			sub.doWork();
-			Thread.sleep(10);
-			i++;
-		}
-		
-		
-		
-		Thread.sleep(1000);
+		st.start();
 
-		pub.stop();
-		archiver.onClose();
+		Thread.sleep(10000);
+		pt.interrupt();
+		st.interrupt();
+
+		}
 	}
 	
 	

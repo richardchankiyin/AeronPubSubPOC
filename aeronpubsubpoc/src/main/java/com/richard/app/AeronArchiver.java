@@ -55,13 +55,13 @@ public class AeronArchiver
     private long lastSeq = 0;
     private State currentState;
 
-    public AeronArchiver(final String host, final int controlChannelPort, final int recordingEventsPort)
+    public AeronArchiver(final String host, final int controlChannelPort, final int recordingEventsPort, final String archiveDir)
     {
         this.host = localHost(host);
         this.controlChannelPort = controlChannelPort;
         this.recordingEventsPort = recordingEventsPort;
         this.idleStrategy = new SleepingMillisIdleStrategy();
-        this.archivingMediaDriver = launchMediaDriver(host, controlChannelPort, recordingEventsPort);
+        this.archivingMediaDriver = launchMediaDriver(host, controlChannelPort, recordingEventsPort, archiveDir);
         this.mutableDirectBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Long.BYTES));
         this.aeron = launchAeron(archivingMediaDriver);
         LOGGER.info("Media Driver directory is {}; Archive directory is {}",
@@ -80,7 +80,7 @@ public class AeronArchiver
     }
 
     private ArchivingMediaDriver launchMediaDriver(final String host, final int controlChannelPort,
-        final int recordingEventsPort)
+        final int recordingEventsPort, final String archiveDir)
     {
         LOGGER.info("launching ArchivingMediaDriver");
         final String controlChannel = AERON_UDP_ENDPOINT + host + ":" + controlChannelPort;
@@ -104,6 +104,7 @@ public class AeronArchiver
             .errorHandler(this::errorHandler)
             .threadingMode(ThreadingMode.SHARED)
             .sharedIdleStrategy(new SleepingMillisIdleStrategy())
+            .aeronDirectoryName(archiveDir)
             .dirDeleteOnStart(true).dirDeleteOnShutdown(true);
 
         return ArchivingMediaDriver.launch(mediaDriverContext, archiveContext);
