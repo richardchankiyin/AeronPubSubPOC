@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.parallel.Execution;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +18,10 @@ import com.richard.app.sample.ReplayMergeSubscriber;
 
 import io.aeron.archive.ArchivingMediaDriver;
 
+import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
 
+@Execution(SAME_THREAD)
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class AeronPubSubTest {
 	private static final Logger log = LoggerFactory.getLogger(AeronPubSubTest.class);
 	@Test
